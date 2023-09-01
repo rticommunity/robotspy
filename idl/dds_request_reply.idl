@@ -1,0 +1,44 @@
+ /*
+ * (c) 2023 Copyright, Real-Time Innovations, Inc.  All rights reserved.
+ *
+ * RTI grants Licensee a license to use, modify, compile, and create derivative
+ * works of the Software.  Licensee has the right to distribute object form
+ * only for use with RTI products.  The Software is provided "as is", with no
+ * warranty of any type, including any warranty for fitness for any purpose.
+ * RTI is under no obligation to maintain or support the Software.  RTI shall
+ * not be liable for any incidental or consequential damages arising out of the
+ * use or inability to use the software.
+ */
+module dds {
+module msg {
+  @nested
+  struct GUID {
+    octet value[16];
+  };
+  @nested
+  struct SequenceNumber {
+    int32 high;
+    uint32 low;
+  };
+  @nested
+  struct SampleIdentity {
+    GUID writer_guid;
+    SequenceNumber sn;
+  };
+  @nested
+  struct CycloneRequestHeader {
+    int64 guid;
+    uint64 seq;
+  };
+  @nested
+  struct RequestHeader {
+    SampleIdentity requestId;
+    string<255> instanceName;
+  };
+  @nested
+  struct ReplyHeader {
+    SampleIdentity relatedRequest;
+    int32 remoteEx;
+  };
+};  // module msg
+};  // module dds
