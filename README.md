@@ -66,7 +66,7 @@ For every detected type, `types_scraper` will load its definition from either:
   When connecting to a DDS Databus, `types_scraper` will run indefinitely,
   unless the `--exit-after` option is used to specify a maximum run time.
 
-- Join multiple DDS domains, save each type in a separate `.idl` file:
+- Join multiple DDS domains:
 
   ```sh
   ros2 run robotspy types_scraper \
@@ -74,8 +74,7 @@ For every detected type, `types_scraper` will load its definition from either:
     -d 1 \
     -d 2/MyQoSLibrary::MyCustomQosProfile \
     --exit-after 10 \
-    --split \
-    -o my_project/idl
+    -o my_project/idl/my_types.idl
   ```
 
   The custom Qos profiles specified through the `--domain` option must be loaded via
@@ -93,14 +92,12 @@ For every detected type, `types_scraper` will load its definition from either:
     -o ros_${ROS_DISTRO}.idl
   ```
 
-- Search the local ROS installation for types from the `visualization_msgs` and `geometry_msgs` packages,
-  and save each type in a separate `.idl` file:
+- Search the local ROS installation for types from the `visualization_msgs` and `geometry_msgs` packages:
 
   ```sh
   ros2 run robotspy types_scraper \
     -D /opt/ros/${ROS_DISTRO} \
-    -o ros_${ROS_DISTRO}/ \
-    --split \
+    -o ros_${ROS_DISTRO}.idl \
     -f '^(visualization|geometry)_msgs::.*'
   ```
 
@@ -151,12 +148,6 @@ ros2 run robotspy types_scraper --output my_package/idl/my_types.idl
 `types_scraper` will attempt to create any non-existing directory
 included in the output file's path, but it will not overwrite the file if it already exists
 (unless options `--overwrite` or `--append` are used).
-
-The generated IDL can also be automatically split into multiple files, by using option `--split`, and,
-optionally, by specifying a base output directory with `--output`.
-
-In this case, `types_scraper` will save the IDL for each detected data type into a separate
-`.idl` file placed in a subdirectory named after the type's own package name and type (i.e. `msg` or `srv`).
 
 ### Input Filtering
 

@@ -106,17 +106,9 @@ class TypesScraperCli:
       help="Dump output to the specified file instead of standard out.",
       type=Path,
       default=None)
-    out_opts.add_argument("--split",
-      help="Split each detected type into a separate file. Files will be placed in subdirectories based on their package names. Use --output to specify the base path for all generated files.",
-      action="store_true",
-      default=False)
-    out_opts.add_argument("--flat",
-      help="When splitting into multiple files, place all files in a single directory. The package name will be encoded in the file name",
-      action="store_true",
-      default=False)
     file_write_opts = out_opts.add_mutually_exclusive_group()
     file_write_opts.add_argument("-a", "--append",
-      help="Append detected types to output file. When splitting into multiple files, allow new files to be added to existing directories.",
+      help="Append detected types to output file.",
       action="store_true",
       default=False)
     file_write_opts.add_argument("-O", "--overwrite",
@@ -221,11 +213,8 @@ class TypesScraperCli:
             no_indent=self.args.no_indent,
             indent_step=self.args.indent_step,
             indent_depth=self.args.indent_depth,
-            overwrite=self.args.overwrite,
-            split=self.args.split))
+            overwrite=self.args.overwrite))
         emitters.append(IdlTypesEmitter(
-          flat=self.args.flat,
-          split=self.args.split,
           output_path=self.args.output,
           no_indent=self.args.no_indent,
           indent_step=self.args.indent_step,

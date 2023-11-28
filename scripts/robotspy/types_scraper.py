@@ -205,12 +205,17 @@ class CppScraper:
       on_detected: Callable,
       lines : Iterable[str] = tuple()):
     for line in lines:
-      detected_type, detected_topic = output_parser.parse_line(line)
-      if detected_type is not None:
-        detected_type = DetectedType(detected_type)
-      if detected_topic is not None:
-        detected_topic = DetectedTopic(detected_topic)
-      on_detected(detected_type, detected_topic)
+      try:
+        detected_type, detected_topic = output_parser.parse_line(line)
+        if detected_type is not None:
+          detected_type = DetectedType(detected_type)
+        if detected_topic is not None:
+          detected_topic = DetectedTopic(detected_topic)
+        on_detected(detected_type, detected_topic)
+      except Exception as e:
+        log.error(f"failed to process line: '{line}'")
+        log.exception(e)
+        continue
 
   def stop(self):
     if self._cpp_scraper is not None:

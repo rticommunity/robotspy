@@ -57,28 +57,22 @@ class FileEmitter(OutputEmitter):
   def __init__(self,
       output_path: Path,
       append: bool = False,
-      overwrite: bool = False,
-      split: bool = False,
-      flat: bool = False,) -> None:
+      overwrite: bool = False) -> None:
     self._append = append
     self._overwrite = overwrite
-    self._split = split
-    self._flat = flat
     self._output_path = output_path
     self._output_file = None
     self._output_dir = None
     self._updated_files = set()
   
   def open(self) -> None:
-    if self._output_path is not None or self._split: 
+    if self._output_path is not None: 
       output_path = self._output_path or Path(os.getcwd())
       self._output_file = self.open_output_file(
         output_path,
-        is_dir=self._split,
+        is_dir=False,
         append=self._append,
         overwrite=self._overwrite)
-      if self._split:
-        self._output_dir = output_path
 
   def close(self,
       detected_types: Iterable[DetectedType],
@@ -141,24 +135,14 @@ class IdlTypesEmitter(FileEmitter):
         "indent": not self._no_indent,
         "indent_depth": self._indent_depth,
         "indent_step": self._indent_step,
-        "add_includes": self._split,
-        "flat_includes": self._flat,
       }
-      idl_str = d_type.to_idl(**to_idl_args)
-
-      if self._split:
-        sep = "_" if self._flat else "/"
-        t_filename = sep.join(chain(d_type.modules,[d_type.name]))
-        t_filename = f"{t_filename}.idl"
-        self.write_output_file(t_filename, idl_str)
-        return
-      
+      idl_str = d_type.to_idl(**to_idl_args)      
       self.write_output(idl_str)
   
   def detected_topic(self, d_topic: DetectedTopic) -> None:
     super().detected_topic(d_topic)
 
-    self.write_output(f"// {d_topic.type} @ \"{d_topic.name}\"")
+    self.write_output(f"// {d_topic.type} @ \"{d_topic.name}\"""\n\n")
 
 class ListOnlyEmitter(FileEmitter):
   def __init__(self,

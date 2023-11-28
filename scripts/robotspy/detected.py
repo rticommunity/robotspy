@@ -39,19 +39,15 @@ class DetectedType:
     self.parsed = False
     parsed_fqname = self.fqname
     try:
-      ( parsed_fqname,
+      ( self.modules,
         self.name,
-        self.modules,
-        self.members,
-        self.annotations ) = self._parse_idl()
+        self.parsed_idl) = self._parse_idl()
       self.parsed = True
     except UnsupportedType:
       self.parsed = False
-      self.name = self.fqname
       self.modules = []
-      self.members = []
-      self.annotations = []
-    
+      self.name = self.fqname
+      self.parsed_idl = self.idl
     if parsed_fqname != self.fqname:
       raise RuntimeError(f"invalid parsed fqname: {parsed_fqname} != {self.fqname}")
 
@@ -76,34 +72,24 @@ class DetectedType:
 
   def _parse_idl(self):
     self._fix_unbounded_members()
+    name_parts = self.fqname.split("::")
+    modules = name_parts[:-1]
+    name = name_parts[-1]
 
-    type_start_re = re.compile(r"\n.*(struct|valuetype) ")
-    
-    type_start_m = type_start_re.search(self.idl)
-    if type_start_m is None:
-      raise RuntimeError(f"unsupported type: '{self.idl}'")
-
-    type_annotations = self.idl[:type_start_m.start()].strip()
-    type_annotations = list(
-      filter(len, map(str.strip, type_annotations.replace("\n"," ").split("@"))))
-
-    remaining = self.idl[type_start_m.end():].strip()    
-    el_end = remaining.find("{")
-    type_fqname = remaining[:el_end].strip()
-
-    remaining = remaining[el_end + 1:]
-
-    if "::" not in type_fqname:
-      type_name = type_fqname
-      type_modules = []
+    if self.idl.startswith("typedef "):
+      "".rfind()
+      type_name_pos = self.idl.rfind(self.fqname)
     else:
-      type_name = type_fqname.split("::")[-1].strip()
-      type_modules = list(map(str.strip, type_fqname.split("::")[:-1]))
+      type_name_pos = self.idl.find(self.fqname)
+    if type_name_pos == -1:
+      raise RuntimeError("failed to find type name in idl string", self.fqname, self.idl)
+    parsed_idl = self.idl[:type_name_pos] + name + self.idl[type_name_pos+len(self.fqname):]
 
-    type_members = remaining[:remaining.find("};")]
-    type_members = list(filter(len, map(str.strip, type_members.replace("\n"," ").split(";"))))
-
-    return type_fqname, type_name, type_modules, type_members, type_annotations
+    return (
+      modules,
+      name,
+      parsed_idl
+    )
 
   @property
   def references(self) -> Iterable[str]:
@@ -120,9 +106,11 @@ class DetectedType:
     return json.dumps({
       "fqname": self.fqname,
       "name": self.name,
+      "kind": self.kind,
       "modules": self.modules,
-      "members": self.members,
-      "annotations": self.annotations,
+      "parsed_idl": self.parsed_idl,
+      # "members": self.members,
+      # "annotations": self.annotations,
       "parsed": self.parsed,
       "idl": self.idl,
     }, indent=2)
@@ -130,9 +118,7 @@ class DetectedType:
   def to_idl(self,
       indent: bool = True,
       indent_depth: int = 0,
-      indent_step = 2,
-      add_includes: bool = False,
-      flat_includes: bool = False) -> str:
+      indent_step = 2) -> str:
 
     if not self.parsed:
       return self.idl
@@ -142,36 +128,25 @@ class DetectedType:
     indent_str = indent_step_str * indent_depth
     # indent_depth = 1
 
-    def _new_line(*args, extra_indent=0, extra_depth=1):
+    def _append(*args, extra_indent=0, extra_depth=1):
       indent and result.append(indent_str * extra_depth)
       indent and result.append(indent_step_str * extra_indent)
       result.extend(args)
-      result.append("\n")
 
-    if add_includes:
-      for reft in self.references:
-        inc_guard = reft.replace("::","_")
-        if flat_includes:
-          inc_file = inc_guard
-        else:
-          inc_file = reft.replace("::","/")
-        _new_line("#ifndef ", inc_guard)
-        _new_line("#define ", inc_guard)
-        _new_line("#include \"", inc_file, ".idl\"")
-        _new_line("#endif  // ", inc_guard)
+    def _new_line(*args, extra_indent=0, extra_depth=1):
+      _append(*args, extra_indent=extra_indent, extra_depth=extra_depth)
+      result.append("\n")
 
     for i, m in enumerate(self.modules):
       _new_line(f"module {m} ", "{", extra_indent=i)
 
-    _new_line("struct ", self.name, " {", extra_indent=len(self.modules))
-    # indent_depth += 1
-    for m in self.members:
-      _new_line(m, ";", extra_indent=len(self.modules) + 1, extra_depth=2)
-    # indent_depth -= 1
-    _new_line("};", extra_indent=len(self.modules))
+    for l in self.parsed_idl.split("\n"):
+      _new_line(l, extra_indent=len(self.modules))
 
     for i, m in enumerate(reversed(self.modules)):
       _new_line("}; ", f"// module {m}", extra_indent=(len(self.modules)-1-i))
+    if self.modules:
+      _new_line()
 
     return "".join(result)
 
