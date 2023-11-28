@@ -8,7 +8,6 @@
 // not be liable for any incidental or consequential damages arising out of the
 // use or inability to use the software.
 #include "robotspy/typecache.hpp"
-#include "robotspy/typecode_mangle.hpp"
 
 namespace robotspy
 {
@@ -73,6 +72,24 @@ make_typecode_member_name_demangled(
   } else {
     return member_name;
   }
+}
+
+static
+bool
+is_typecode_complex(const DDS_TCKind tckind)
+{
+  return (DDS_TK_ENUM == tckind
+    || DDS_TK_STRUCT == tckind
+    || DDS_TK_VALUE == tckind
+    || DDS_TK_UNION == tckind)
+}
+
+static
+bool
+is_typecode_collection(const DDS_TCKind tckind)
+{
+  return (DDS_TK_ARRAY == tckind
+    || DDS_TK_SEQUENCE == tckind)
 }
 
 TypeCache::TypeCache(const TypeCacheOptions & options)
@@ -376,6 +393,16 @@ TypeCache::collect_nested_typecodes(const DDS_TypeCode * const tc, const bool ro
         DDS_TypeCodeFactory_delete_tc(tc_factory_, n, &ex);
       }
     });
+  // Check if the type has a concrete base type, and if so, collect it
+  DDS_TypeCode *concrete_tc = DDS_TypeCode_concrete_base_type(tc, &ex)
+  if (DDS_NO_EXCEPTION_CODE != ex) {
+    throw std::runtime_error("failed to get concrete base type");
+  }
+  std::vector<DDS_TypeCode *> inspect_nested;
+  if (nullptr != concrete_tc) {
+    inspect_nested.insert(inspect_nested.end(), concrete_tc)
+  }
+  // Inspect the type codes of all nested members
   size_t member_count = DDS_TypeCode_member_count(tc, &ex);
   if (DDS_NO_EXCEPTION_CODE != ex) {
     throw std::runtime_error("failed to get typecode member count");
@@ -385,23 +412,29 @@ TypeCache::collect_nested_typecodes(const DDS_TypeCode * const tc, const bool ro
     if (nullptr == member_tc || DDS_NO_EXCEPTION_CODE != ex) {
       throw std::runtime_error("failed to get typecode member id");
     }
-    auto tc_kind = DDS_TypeCode_kind(member_tc, &ex);
+    inspect_nested.insert(inspect_nested.end(), member_tc)
+  }
+  if (DDS_TK_UNION == )
+
+  for (auto & ntc : inspect_nested) {
+    auto tc_kind = DDS_TypeCode_kind(ntc, &ex);
     if (DDS_NO_EXCEPTION_CODE != ex) {
       throw std::runtime_error("failed to get typecode kind");
     }
     DDS_TypeCode * nested_tc = nullptr;
-    if (DDS_TK_STRUCT == tc_kind) {
-      nested_tc = member_tc;
-    } else if (DDS_TK_SEQUENCE == tc_kind || DDS_TK_ARRAY == tc_kind) {
-      nested_tc = resolve_collection_typecode(member_tc);
+    if (is_typecode_complex(tc_kind)) {
+      nested_tc = ntc;
+    } else if (is_typecode_collection(tc_kind)) {
+      nested_tc = resolve_collection_typecode(ntc);
       auto collection_tc_k = DDS_TypeCode_kind(nested_tc, &ex);
       if (DDS_NO_EXCEPTION_CODE != ex) {
         throw std::runtime_error("failed to get collection typecode kind");
       }
-      if (DDS_TK_STRUCT != collection_tc_k) {
-        continue;
+      if (!is_typecode_complex(collection_tc_k)) {
+        nested_tc = nullptr;
       }
-    } else {
+    }
+    if (nullptr == nested_tc) {
       continue;
     }
     std::vector<DDS_TypeCode *> nested = collect_nested_typecodes(nested_tc, ros_type);
@@ -631,53 +664,6 @@ TypeCache::demangle_typecode(const DDS_TypeCode * const tc)
     tc,
     make_typecode_name_demangled,
     make_typecode_member_name_demangled);
-}
-
-std::vector<const DDS_TypeCode *>
-TypeCache::extract_nested_typecodes(
-  const DDS_TypeCode * const tc,
-  std::vector<const DDS_TypeCode *> * tc_cache)
-{
-  std::vector<const DDS_TypeCode *> stack_tc_cache;
-  if (nullptr == tc_cache) {
-    tc_cache = &stack_tc_cache;
-  }
-  if (std::find(tc_cache->begin(), tc_cache->end(), tc) == tc_cache->end()) {
-    tc_cache->insert(tc_cache->begin(), tc);
-  }
-  DDS_ExceptionCode_t ex = DDS_NO_EXCEPTION_CODE;
-  size_t member_count = DDS_TypeCode_member_count(tc, &ex);
-  if (DDS_NO_EXCEPTION_CODE != ex) {
-    throw std::runtime_error("failed to get typecode member count");
-  }
-  for (size_t i = 0; i < member_count; i++) {
-    DDS_TypeCode * member_tc = DDS_TypeCode_member_type(tc, i, &ex);
-    if (nullptr == member_tc || DDS_NO_EXCEPTION_CODE != ex) {
-      throw std::runtime_error("failed to get typecode member id");
-    }
-    auto tc_kind = DDS_TypeCode_kind(member_tc, &ex);
-    if (DDS_NO_EXCEPTION_CODE != ex) {
-      throw std::runtime_error("failed to get typecode kind");
-    }
-    DDS_TypeCode * nested_tc = nullptr;
-    if (DDS_TK_STRUCT == tc_kind) {
-      nested_tc = member_tc;
-    } else if (DDS_TK_SEQUENCE == tc_kind || DDS_TK_ARRAY == tc_kind) {
-      nested_tc = resolve_collection_typecode(member_tc);
-      auto collection_tc_k = DDS_TypeCode_kind(nested_tc, &ex);
-      if (DDS_NO_EXCEPTION_CODE != ex) {
-        throw std::runtime_error("failed to get collection typecode kind");
-      }
-      if (DDS_TK_STRUCT != collection_tc_k) {
-        continue;
-      }
-    } else {
-      continue;
-    }
-    extract_nested_typecodes(nested_tc, tc_cache);
-  }
-
-  return stack_tc_cache;
 }
 
 DDS_TypeCode*

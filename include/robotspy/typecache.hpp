@@ -420,11 +420,6 @@ protected:
   DDS_TypeCode *
   demangle_typecode(const DDS_TypeCode * const tc);
 
-  std::vector<const DDS_TypeCode *>
-  extract_nested_typecodes(
-    const DDS_TypeCode * const tc,
-    std::vector<const DDS_TypeCode *> * tc_cache = nullptr);
-
   DDS_TypeCode*
   mangle_typecode_recur(
     const DDS_TypeCode * const tc,
